@@ -48,6 +48,7 @@ func main() {
 	api.POST("/keys/add", e.AddKeys, e.DecryptPayloadMiddleware)
 	api.GET("/keys/:id", e.GetEncryptionKey)
 
+	log.Printf("Demo server is running on http://localhost:%d (press Ctrl+C to stop)", *port)
 	log.Fatal(e.Run(standard.WithConfig(engine.Config{
 		Address: fmt.Sprintf(":%d", *port),
 	})))
