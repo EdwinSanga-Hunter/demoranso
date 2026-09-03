@@ -2,7 +2,6 @@ package web
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo"
@@ -69,7 +68,10 @@ func (e *Engine) GetEncryptionKey(c echo.Context) error {
 		return c.JSON(http.StatusTeapot, ApiResponseResourceNotFound)
 	}
 
-	return c.JSON(http.StatusOK, fmt.Sprintf(`{"status": 200, "enckey": "%s"}`, enckey))
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"status": 200,
+		"enckey": enckey,
+	})
 }
 
 // Index simply returns a OK

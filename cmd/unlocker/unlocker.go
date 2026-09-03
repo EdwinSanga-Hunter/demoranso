@@ -1,6 +1,3 @@
-// +build windows
-// +build go1.8
-
 package main
 
 import (
@@ -28,7 +25,10 @@ func main() {
 	var key string
 	for {
 		fmt.Println("Type your encryption key and press enter to proceed")
-		fmt.Scanf("%s\n", &key)
+		if _, err := fmt.Scanf("%s\n", &key); err != nil {
+			// No input available (e.g. EOF), nothing else we can do
+			os.Exit(2)
+		}
 		if len(key) != 32 {
 			fmt.Println("Your encryption key must have 32 characters")
 			continue
@@ -72,8 +72,13 @@ func decryptFiles(key string) {
 		// Loop over the interesting directories
 		for _, folder := range cmd.InterestingDirs {
 			filepath.Walk(folder, func(path string, f os.FileInfo, err error) error {
-				// we doesn't care about the err returned here
 				cmd.Logger.Println("Walking " + path)
+
+				// A nil FileInfo means an error walking this entry (e.g. missing
+				// or inaccessible dir). Skip it instead of panicking.
+				if f == nil || err != nil {
+					return nil
+				}
 
 				if f.IsDir() && utils.SliceContainsSubstring(filepath.Base(path), cmd.SkippedDirs) {
 					cmd.Logger.Printf("Skipping dir %s", path)

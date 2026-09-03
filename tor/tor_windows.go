@@ -1,5 +1,6 @@
+//go:build windows
 // +build windows
-//
+
 // Package tor provides a wrapper around the tor proxy command
 package tor
 
