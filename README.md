@@ -214,6 +214,7 @@ sudo ufw allow 8080
 
    It must answer `OK`. If it hangs, the networking/firewall step above is wrong.
 4. Run `ransomware.exe` as Administrator. With `set RANSOMWARE_DIR=C:\demo` it encrypts just that folder; without it, it walks all drives.
+   
 5. Watch the server console on Linux: `Successfully saved key pair <ID> - <KEY>` proves the key exchange (encrypted with the RSA-4096 public key) worked.
 
 ### Step 4 — Get the key and decrypt
